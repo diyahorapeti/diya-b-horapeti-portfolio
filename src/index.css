@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-ink: #08090c;
+  --color-panel: #0f1116;
+  --color-bone: #e8e6df;
+  --color-dim: #8a8f98;
+  --color-signal: #ff5b1f;
+}
+
+/* ── Lenis smooth-scroll resets ── */
+html { background: #08090c; }
+html.lenis,
+html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+
+/* ── Base body ── */
+body {
+  margin: 0;
+  background: #08090c;
+  color: #e8e6df;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── HUD Grid ──
+   Faint technical crosshatch: two 1-px lines per 64 px tile
+   using an rgba value that reads well on the near-black background */
+.hud-grid {
+  background-image:
+    linear-gradient(rgba(232, 230, 223, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 230, 223, 0.04) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ── HUD Frame ──
+   Signal-orange corner brackets drawn with ::before (top-left)
+   and ::after (bottom-right) pseudo-elements. */
+.hud-frame {
+  position: relative;
+}
+
+.hud-frame::before,
+.hud-frame::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: #ff5b1f;
+  border-style: solid;
+  pointer-events: none;
+}
+
+/* Top-left corner */
+.hud-frame::before {
+  top: 0;
+  left: 0;
+  border-width: 2px 0 0 2px;
+}
+
+/* Bottom-right corner */
+.hud-frame::after {
+  bottom: 0;
+  right: 0;
+  border-width: 0 2px 2px 0;
+}
+
+/* ── Custom cursor: hide OS cursor when .has-cursor is active ── */
+@media (pointer: fine) {
+  body.has-cursor,
+  body.has-cursor a,
+  body.has-cursor button {
+    cursor: none;
+  }
+}
