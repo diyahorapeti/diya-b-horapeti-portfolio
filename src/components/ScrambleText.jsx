@@ -119,12 +119,18 @@ export default function ScrambleText({
         clearInterval(intervalId);
         clearTimeout(timeoutId);
         observer.disconnect();
+        // Reset so the second StrictMode mount can re-run the animation
+        hasPlayed.current = false;
+        setDisplay(text);
       };
     }
 
     return () => {
       clearInterval(intervalId);
       clearTimeout(timeoutId);
+      // Reset so the second StrictMode mount can re-run the animation
+      hasPlayed.current = false;
+      setDisplay(text);
     };
   // Re-run if the `text` prop changes (e.g. rotating status lines)
   // eslint-disable-next-line react-hooks/exhaustive-deps

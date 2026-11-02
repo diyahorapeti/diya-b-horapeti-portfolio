@@ -138,7 +138,7 @@ export default function About() {
                   {/* Greyscale photo with extra contrast */}
                   <img
                     src={portraitSrc}
-                    alt={`${personalInfo.name} — ${personalInfo.role}`}
+                    alt="Diya B Horapeti — Data Analyst, TAP Academy student"
                     className="absolute inset-0 w-full h-full object-cover grayscale contrast-125"
                     draggable={false}
                   />
