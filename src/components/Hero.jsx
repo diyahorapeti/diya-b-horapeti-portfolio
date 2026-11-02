@@ -26,24 +26,35 @@ export default function Hero() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const ctx = gsap.context(() => {
-      // Staggered fade-up for all data-hero="fade" elements
-      gsap.from('[data-hero="fade"]', {
-        opacity: 0,
-        y: 30,
-        duration: 1,
-        ease: 'power3.out',
-        stagger: 0.12,
-        delay: 0.3,
-      });
+      // gsap.fromTo guarantees the final state (opacity:1, y:0) even if
+      // ctx.revert() + remount happens in React 18 StrictMode.
+      gsap.fromTo(
+        '[data-hero="fade"]',
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1,
+          ease: 'power3.out',
+          stagger: 0.12,
+          delay: 0.3,
+          clearProps: 'opacity,transform', // remove inline styles when done
+        }
+      );
 
       // Divider draws from the left
-      gsap.from(dividerRef.current, {
-        scaleX: 0,
-        transformOrigin: 'left center',
-        duration: 1.2,
-        ease: 'power3.inOut',
-        delay: 0.3,
-      });
+      gsap.fromTo(
+        dividerRef.current,
+        { scaleX: 0 },
+        {
+          scaleX: 1,
+          transformOrigin: 'left center',
+          duration: 1.2,
+          ease: 'power3.inOut',
+          delay: 0.3,
+          clearProps: 'transform',
+        }
+      );
     }, sectionRef);
 
     return () => ctx.revert();
@@ -58,20 +69,20 @@ export default function Hero() {
       {/* ── Two-column grid ─────────────────────────────────────────── */}
       <div className="max-w-[1440px] mx-auto w-full grid lg:grid-cols-[1.1fr_0.9fr] items-center gap-10 flex-1">
 
-        {/* ══ LEFT COLUMN ══════════════════════════════════════════════ */}
-        <div className="flex flex-col gap-6">
+        {/* ══ LEFT COLUMN — the wrapper fades as one unit ══════════════════ */}
+        <div data-hero="fade" className="flex flex-col gap-6">
 
-          {/* Eyebrow */}
+          {/* Eyebrow — inside the fading wrapper, no separate fade needed */}
           <p
-            data-hero="fade"
             className="font-mono text-xs uppercase tracking-[0.3em] text-signal"
           >
             {heroContent.eyebrow}
           </p>
 
-          {/* Name — two-line, first solid, rest outlined */}
+          {/* Name — two-line, first solid, rest outlined.
+              The h1 itself is NOT faded by GSAP — only the column wrapper
+              is, so the name always has a guaranteed visible final state. */}
           <h1
-            data-hero="fade"
             className="text-[clamp(3.2rem,11vw,9.5rem)] font-bold uppercase leading-[0.88] tracking-[-0.04em]"
           >
             {/* First word: solid bone */}
@@ -101,7 +112,7 @@ export default function Hero() {
           />
 
           {/* Role + intro */}
-          <div data-hero="fade" className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3">
             <p className="font-mono text-xs uppercase tracking-[0.25em] text-dim">
               {personalInfo.role}
             </p>
@@ -111,7 +122,7 @@ export default function Hero() {
           </div>
 
           {/* CTA buttons */}
-          <div data-hero="fade" className="flex flex-wrap gap-3 mt-2">
+          <div className="flex flex-wrap gap-3 mt-2">
             {/* Primary — signal fill, hover to bone */}
             <a
               href={heroContent.ctaPrimary.href}
