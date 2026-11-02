@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://YOUR-SITE-URL/sitemap.xml
+Sitemap: https://portfolio-eight-iota-ws1nyh20hu.vercel.app/sitemap.xml

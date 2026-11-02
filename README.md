@@ -2,7 +2,7 @@
 
 A "Signal HUD" style data analyst portfolio — dark, technical, and motion-led, built with React 19, Vite, and Tailwind CSS 4.
 
-**Live site:** https://YOUR-SITE-URL/
+**Live site:** https://portfolio-eight-iota-ws1nyh20hu.vercel.app/
 
 ---
 
