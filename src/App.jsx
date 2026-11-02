@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Lenis from 'lenis';
+
+import { useSmoothScroll } from './hooks/useSmoothScroll';
 
 import Cursor from './components/Cursor';
 import Hud from './components/Hud';
@@ -12,49 +12,16 @@ import Journey from './components/Journey';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 
-// Register ScrollTrigger once at module level
+// Register ScrollTrigger once at module level (before any component mounts)
 gsap.registerPlugin(ScrollTrigger);
 
 function App() {
-  useEffect(() => {
-    const prefersReducedMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches;
-
-    let lenis;
-
-    if (!prefersReducedMotion) {
-      // One Lenis instance drives smooth scrolling
-      lenis = new Lenis();
-
-      // Named tick function so it can be removed from gsap.ticker on cleanup
-      function onTick(time) {
-        lenis.raf(time * 1000);
-      }
-
-      // GSAP ticker drives Lenis — one shared animation loop
-      gsap.ticker.add(onTick);
-      gsap.ticker.lagSmoothing(0);
-
-      // Keep ScrollTrigger in sync with every Lenis scroll event
-      lenis.on('scroll', ScrollTrigger.update);
-
-      // Refresh after layout is painted
-      ScrollTrigger.refresh();
-
-      return () => {
-        gsap.ticker.remove(onTick);
-        lenis.destroy();
-      };
-    }
-
-    // Still refresh even without smooth scroll
-    ScrollTrigger.refresh();
-  }, []);
+  // Sets up Lenis smooth scroll + GSAP ticker + anchor-link handling
+  useSmoothScroll();
 
   return (
     <>
-      {/* Custom cursor — only renders on fine-pointer (desktop) devices */}
+      {/* Custom crosshair cursor — only activates on fine-pointer devices */}
       <Cursor />
 
       {/* Fixed top HUD navigation bar */}

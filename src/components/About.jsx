@@ -1,24 +1,37 @@
 import { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { aboutContent, skillGroups } from '../data/portfolioData';
+import { personalInfo, aboutContent, skillGroups } from '../data/portfolioData';
+import ScrambleText from './ScrambleText';
+
+// ── Portrait image ─────────────────────────────────────────────────────────
+// Load all matching files; the component shows a placeholder if none exist.
+const portraitModules = import.meta.glob(
+  '../assets/about/about-portrait.*',
+  { eager: true }
+);
+const portraitSrc =
+  Object.values(portraitModules)[0]?.default ?? null;
+
+// ── Animated counter ───────────────────────────────────────────────────────
 
 /**
- * useCounter — animates from 0 to `target` once `active` becomes true.
- * Uses a cubic ease-out for a natural deceleration feel.
+ * useCounter — ramps from 0 to `target` with an ease-out curve
+ * once `active` flips to true. Plays only once.
  */
 function useCounter(target, active) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     if (!active) return;
-    const DURATION = 1400; // ms
+
+    const DURATION = 1600; // ms — matches spec
     const startTime = performance.now();
 
     const step = (now) => {
       const progress = Math.min((now - startTime) / DURATION, 1);
-      // Ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
+      // ease power2.out: deceleration curve
+      const eased = 1 - Math.pow(1 - progress, 2);
       setCount(Math.round(eased * target));
       if (progress < 1) requestAnimationFrame(step);
     };
@@ -30,37 +43,48 @@ function useCounter(target, active) {
 }
 
 /**
- * StatCard — a single animated counter card.
- * Starts counting when scrolled into view.
+ * StatItem — one stat cell; starts counting when scrolled into view.
  */
-function StatCard({ value, suffix, label }) {
+function StatItem({ value, suffix, label }) {
   const [active, setActive] = useState(false);
   const count = useCounter(value, active);
   const ref = useRef(null);
 
   useEffect(() => {
-    const trigger = ScrollTrigger.create({
+    const st = ScrollTrigger.create({
       trigger: ref.current,
-      start: 'top 88%',
-      once: true,           // never re-trigger — value stays visible
+      start: 'top 85%',
+      once: true,
       onEnter: () => setActive(true),
     });
-    return () => trigger.kill();
+    return () => st.kill();
   }, []);
 
   return (
-    <div ref={ref} className="hud-frame p-6 border border-bone/10 bg-panel">
-      <p className="font-sans text-4xl font-bold text-bone mb-2 tabular-nums">
+    <div ref={ref} className="flex flex-col gap-2 px-6 py-8 text-center lg:text-left">
+      {/* Number + suffix */}
+      <dt className="text-4xl md:text-6xl font-bold tabular-nums text-bone leading-none">
         {count}
         <span className="text-signal">{suffix}</span>
-      </p>
-      <p className="font-mono text-xs uppercase tracking-widest text-dim">{label}</p>
+      </dt>
+      {/* Label */}
+      <dd className="font-mono text-[10px] md:text-xs uppercase tracking-[0.2em] text-dim">
+        {label}
+      </dd>
     </div>
   );
 }
 
+// ── Main component ─────────────────────────────────────────────────────────
+
 /**
- * About — biography, animated stat counters, and a 4-column skills grid.
+ * About — bio section with portrait, animated stat counters, and skill modules.
+ *
+ * Structure:
+ *   • Section label (ScrambleText, trigger="view")
+ *   • Two-column layout: portrait left, text + stats + skills right
+ *   • Skill modules grid: gap-px to make 1-px dividers between tiles
+ *   • ScrollTrigger reveal animation on data-about="reveal" elements
  */
 export default function About() {
   const sectionRef = useRef(null);
@@ -69,15 +93,15 @@ export default function About() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     const ctx = gsap.context(() => {
-      gsap.from('[data-about-item]', {
-        y: 32,
+      gsap.from('[data-about="reveal"]', {
         opacity: 0,
-        duration: 0.85,
-        stagger: 0.1,
+        y: 40,
+        duration: 0.9,
         ease: 'power3.out',
+        stagger: 0.12,
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: 'top 78%',
+          start: 'top 75%',
           once: true,
         },
       });
@@ -87,70 +111,130 @@ export default function About() {
   }, []);
 
   return (
-    <section id="about" ref={sectionRef} className="py-28 border-t border-bone/10">
-      <div className="mx-auto max-w-7xl px-6">
+    <section
+      id="about"
+      ref={sectionRef}
+      className="w-full px-5 md:px-10 py-28 md:py-40 border-t border-bone/10"
+    >
+      <div className="max-w-[1440px] mx-auto">
 
-        {/* ── Label ── */}
-        <p
-          data-about-item
-          className="font-mono text-xs uppercase tracking-[0.25em] text-signal mb-8 flex items-center gap-3"
-        >
-          <span className="w-6 h-px bg-signal inline-block" />
-          {aboutContent.label}
-        </p>
-
-        {/* ── Heading + paragraph ── */}
-        <div className="grid lg:grid-cols-2 gap-12 mb-20">
-          <h2
-            data-about-item
-            className="font-sans text-4xl sm:text-5xl font-bold text-bone leading-tight"
-          >
-            {aboutContent.heading}
-          </h2>
-          <p
-            data-about-item
-            className="font-sans text-dim text-lg leading-relaxed self-center"
-          >
-            {aboutContent.paragraph}
-          </p>
+        {/* ── Section label ─────────────────────────────────────────── */}
+        <div data-about="reveal" className="mb-10">
+          <ScrambleText
+            text={aboutContent.label}
+            trigger="view"
+            className="font-mono text-xs uppercase tracking-[0.3em] text-signal"
+          />
         </div>
 
-        {/* ── Animated stat counters ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-24">
-          {aboutContent.stats.map((stat) => (
-            <StatCard key={stat.label} {...stat} />
-          ))}
-        </div>
+        {/* ── Two-column grid ───────────────────────────────────────── */}
+        <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-12 lg:gap-20 items-start">
 
-        {/* ── Skills grid ── */}
-        <div data-about-item>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-signal mb-8 flex items-center gap-3">
-            <span className="w-6 h-px bg-signal inline-block" />
-            02 / Skills
-          </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {skillGroups.map((group) => (
-              <div
-                key={group.title}
-                className="hud-frame border border-bone/10 bg-panel p-5"
+          {/* ══ LEFT — portrait ════════════════════════════════════════ */}
+          <div data-about="reveal">
+            <div className="hud-frame relative aspect-[4/5] max-w-[420px] border border-bone/10 bg-panel overflow-hidden">
+              {portraitSrc ? (
+                <>
+                  {/* Greyscale photo with extra contrast */}
+                  <img
+                    src={portraitSrc}
+                    alt={`${personalInfo.name} — ${personalInfo.role}`}
+                    className="absolute inset-0 w-full h-full object-cover grayscale contrast-125"
+                    draggable={false}
+                  />
+                  {/* Signal-orange tint overlay */}
+                  <div
+                    className="absolute inset-0 bg-signal opacity-25"
+                    style={{ mixBlendMode: 'multiply' }}
+                    aria-hidden="true"
+                  />
+                </>
+              ) : (
+                /* Placeholder when portrait file is missing */
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-mono text-xs uppercase tracking-[0.2em] text-dim/40">
+                    portrait.missing
+                  </span>
+                </div>
+              )}
+
+              {/* Bottom-left ID label */}
+              <span
+                className="absolute bottom-3 left-3 z-10 font-mono text-[10px] uppercase tracking-[0.2em] text-bone/50 pointer-events-none select-none"
+                aria-hidden="true"
               >
-                <p className="font-mono text-xs uppercase tracking-widest text-signal mb-5">
-                  {group.title}
-                </p>
-                <ul className="space-y-2.5">
-                  {group.items.map((item) => (
-                    <li
-                      key={item}
-                      className="font-sans text-sm text-bone/80 flex items-center gap-2.5"
-                    >
-                      {/* Signal-orange bullet */}
-                      <span className="w-1.5 h-1.5 bg-signal flex-shrink-0" aria-hidden="true" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
+                ID · {personalInfo.brandName}
+              </span>
+            </div>
+          </div>
+
+          {/* ══ RIGHT — text, stats, skills ════════════════════════════ */}
+          <div className="flex flex-col gap-10">
+
+            {/* Heading */}
+            <h2
+              data-about="reveal"
+              className="text-[clamp(2.2rem,5vw,4.5rem)] font-bold leading-[1.02] tracking-[-0.03em] text-bone"
+            >
+              {aboutContent.heading}
+            </h2>
+
+            {/* Paragraph */}
+            <p
+              data-about="reveal"
+              className="text-lg md:text-xl leading-relaxed text-bone/75 max-w-2xl"
+            >
+              {aboutContent.paragraph}
+            </p>
+
+            {/* ── Stats — 3-col between two 1-px lines ───────────────── */}
+            <dl
+              data-about="reveal"
+              className="grid grid-cols-3 border-y border-bone/10 divide-x divide-bone/10"
+            >
+              {aboutContent.stats.map((stat) => (
+                <StatItem key={stat.label} {...stat} />
+              ))}
+            </dl>
+
+            {/* ── Skill modules ─────────────────────────────────────── */}
+            <div data-about="reveal">
+              {/*
+                gap-px on a bg-bone/10 wrapper creates 1-px dividing lines
+                between tiles; each tile uses bg-ink to "cut out" from the gap
+              */}
+              <div className="grid sm:grid-cols-2 gap-px bg-bone/10 border border-bone/10">
+                {skillGroups.map((group, i) => (
+                  <div
+                    key={group.title}
+                    className="bg-ink p-6 hover:bg-panel transition-colors duration-200"
+                  >
+                    {/* Module header row */}
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="font-mono text-[11px] uppercase tracking-[0.25em] text-signal">
+                        {group.title}
+                      </span>
+                      <span className="font-mono text-[11px] text-dim">
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    {/* Skill tags */}
+                    <div className="flex flex-wrap gap-2">
+                      {group.items.map((item) => (
+                        <span
+                          key={item}
+                          className="border border-bone/15 px-2.5 py-1 font-mono text-xs text-bone/70"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+
           </div>
         </div>
       </div>

@@ -1,199 +1,297 @@
 import { useRef, useState } from 'react';
-import emailjs from '@emailjs/browser';
 import {
   personalInfo,
   contactContent,
   socialLinks,
   emailjsConfig,
 } from '../data/portfolioData';
+import ScrambleText from './ScrambleText';
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/** True only when the user has filled in their real EmailJS credentials. */
+function emailjsIsConfigured() {
+  return (
+    emailjsConfig.serviceId  !== 'YOUR_EMAILJS_SERVICE_ID'  &&
+    emailjsConfig.templateId !== 'YOUR_EMAILJS_TEMPLATE_ID' &&
+    emailjsConfig.publicKey  !== 'YOUR_EMAILJS_PUBLIC_KEY'
+  );
+}
 
 /**
- * Contact — two-column layout with an EmailJS-powered form on the left
- * and direct contact details on the right.
+ * Build a mailto: URL so the visitor's default email client picks up the
+ * subject and a pre-filled body. Used as a fallback when EmailJS isn't set up.
+ */
+function buildMailtoUrl(name, email, message) {
+  const subject = encodeURIComponent('Portfolio contact');
+  const body = encodeURIComponent(
+    `Name: ${name}\nEmail: ${email}\n\n${message}`
+  );
+  return `mailto:${personalInfo.email}?subject=${subject}&body=${body}`;
+}
+
+// First name derived from personalInfo — lower-cased for the terminal prompt.
+const firstName = personalInfo.name.split(' ')[0].toLowerCase();
+
+// ── shared field style ────────────────────────────────────────────────────────
+// Transparent bg, only a bottom border that turns signal on focus.
+// No rounded corners, no outline ring.
+const fieldClass =
+  'w-full bg-transparent border-b border-bone/20 focus:border-signal ' +
+  'font-mono text-sm text-bone placeholder:text-dim/40 ' +
+  'py-3 outline-none transition-colors duration-200';
+
+// ── Contact ───────────────────────────────────────────────────────────────────
+/**
+ * Contact — last main section.
+ *
+ * Left col : heading, email link, phone, social links.
+ * Right col : terminal-style EmailJS form with mailto fallback.
+ *
+ * Sending logic:
+ *   - If emailjsConfig credentials look like placeholders → open a mailto link
+ *     in a new tab, show success, reset form.
+ *   - If configured → dynamically import @emailjs/browser and call sendForm.
  */
 export default function Contact() {
   const formRef = useRef(null);
-  // idle | sending | success | error
+  // 'idle' | 'sending' | 'success' | 'error'
   const [status, setStatus] = useState('idle');
 
-  const handleSubmit = async (e) => {
+  /** Show a status message and auto-clear it after ~4 s. */
+  function showStatus(s) {
+    setStatus(s);
+    setTimeout(() => setStatus('idle'), 4000);
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
+    if (status === 'sending') return;
     setStatus('sending');
+
+    const form = formRef.current;
+    const name    = form.user_name.value.trim();
+    const email   = form.user_email.value.trim();
+    const message = form.message.value.trim();
+
+    // ── Mailto fallback ───────────────────────────────────────────────────
+    if (!emailjsIsConfigured()) {
+      window.open(buildMailtoUrl(name, email, message), '_blank', 'noopener,noreferrer');
+      form.reset();
+      showStatus('success');
+      return;
+    }
+
+    // ── EmailJS send ──────────────────────────────────────────────────────
     try {
+      const emailjs = await import('@emailjs/browser');
       await emailjs.sendForm(
         emailjsConfig.serviceId,
         emailjsConfig.templateId,
-        formRef.current,
-        { publicKey: emailjsConfig.publicKey }
+        form,
+        emailjsConfig.publicKey
       );
-      setStatus('success');
-      formRef.current.reset();
-    } catch {
-      setStatus('error');
+      form.reset();
+      showStatus('success');
+    } catch (err) {
+      console.error('[Contact] EmailJS error:', err);
+      showStatus('error');
     }
-  };
-
-  // Shared classes for text inputs and textarea
-  const inputClass =
-    'w-full bg-panel border border-bone/10 text-bone font-sans text-sm px-4 py-3 ' +
-    'placeholder:text-dim/40 focus:outline-none focus:border-signal transition-colors';
+  }
 
   return (
-    <section id="contact" className="py-28 border-t border-bone/10">
-      <div className="mx-auto max-w-7xl px-6">
+    <section
+      id="contact"
+      /* HUD grid texture fills the background */
+      className="hud-grid px-5 md:px-10 py-28 md:py-40"
+    >
+      <div className="max-w-[1440px] mx-auto grid lg:grid-cols-2 gap-14 lg:gap-20">
 
-        {/* Label */}
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-signal mb-8 flex items-center gap-3">
-          <span className="w-6 h-px bg-signal inline-block" />
-          {contactContent.label}
-        </p>
+        {/* ══════════════════════════════════════════════════════════════
+            LEFT — heading + direct contact details
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="flex flex-col gap-8">
 
-        <h2 className="font-sans text-4xl sm:text-5xl font-bold text-bone mb-6 leading-tight">
-          {contactContent.heading}
-        </h2>
+          {/* Label */}
+          <ScrambleText
+            text={contactContent.label}
+            className="block font-mono text-xs uppercase tracking-[0.3em] text-signal"
+          />
 
-        <p className="font-sans text-dim text-lg mb-16 max-w-lg leading-relaxed">
-          {contactContent.note}
-        </p>
+          {/* Heading */}
+          <h2
+            className="font-bold leading-[0.95] tracking-[-0.04em] text-bone"
+            style={{ fontSize: 'clamp(2.6rem, 7vw, 6rem)' }}
+          >
+            {contactContent.heading}
+          </h2>
 
-        <div className="grid lg:grid-cols-2 gap-16">
+          {/* Note */}
+          <p className="text-lg text-bone/70 max-w-md leading-relaxed">
+            {contactContent.note}
+          </p>
 
-          {/* ── Contact form ── */}
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-5" noValidate>
+          {/* Email — thick signal underline */}
+          <a
+            href={`mailto:${personalInfo.email}`}
+            className="
+              font-mono text-lg md:text-2xl text-bone
+              underline decoration-signal decoration-2 underline-offset-8
+              hover:text-signal transition-colors duration-200
+              break-all
+            "
+          >
+            {personalInfo.email}
+          </a>
 
+          {/* Phone — only when set */}
+          {personalInfo.phone && (
+            <p className="font-mono text-sm text-dim">
+              {personalInfo.phone}
+            </p>
+          )}
+
+          {/* Social links — skip empty strings */}
+          <div className="flex flex-wrap gap-6 pt-2">
+            {socialLinks.github && (
+              <a
+                href={socialLinks.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs uppercase tracking-[0.2em] text-dim hover:text-bone transition-colors duration-200"
+              >
+                GitHub ↗
+              </a>
+            )}
+            {socialLinks.linkedin && (
+              <a
+                href={socialLinks.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs uppercase tracking-[0.2em] text-dim hover:text-bone transition-colors duration-200"
+              >
+                LinkedIn ↗
+              </a>
+            )}
+            {socialLinks.instagram && (
+              <a
+                href={socialLinks.instagram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-xs uppercase tracking-[0.2em] text-dim hover:text-bone transition-colors duration-200"
+              >
+                Instagram ↗
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════════
+            RIGHT — terminal-style form
+        ══════════════════════════════════════════════════════════════ */}
+        <div className="hud-frame border border-bone/10 bg-ink/70 backdrop-blur p-6 md:p-10">
+
+          {/* Terminal prompt line */}
+          <p className="font-mono text-xs text-dim mb-8 select-none">
+            <span className="text-signal">$</span>
+            {` new message --to ${firstName}`}
+          </p>
+
+          <form
+            ref={formRef}
+            onSubmit={handleSubmit}
+            noValidate
+            className="flex flex-col gap-8"
+          >
+            {/* ── Name ── */}
             <div>
               <label
                 htmlFor="contact-name"
-                className="font-mono text-xs uppercase tracking-widest text-dim block mb-2"
+                className="block font-mono text-[11px] uppercase tracking-[0.25em] text-signal mb-3"
               >
-                Name
+                &gt; name
               </label>
               <input
                 id="contact-name"
                 name="user_name"
                 type="text"
                 required
-                className={inputClass}
-                placeholder="Your name"
+                placeholder="Your full name"
+                className={fieldClass}
               />
             </div>
 
+            {/* ── Email ── */}
             <div>
               <label
                 htmlFor="contact-email"
-                className="font-mono text-xs uppercase tracking-widest text-dim block mb-2"
+                className="block font-mono text-[11px] uppercase tracking-[0.25em] text-signal mb-3"
               >
-                Email
+                &gt; email
               </label>
               <input
                 id="contact-email"
                 name="user_email"
                 type="email"
                 required
-                className={inputClass}
-                placeholder="your@email.com"
+                placeholder="you@example.com"
+                className={fieldClass}
               />
             </div>
 
+            {/* ── Message ── */}
             <div>
               <label
                 htmlFor="contact-message"
-                className="font-mono text-xs uppercase tracking-widest text-dim block mb-2"
+                className="block font-mono text-[11px] uppercase tracking-[0.25em] text-signal mb-3"
               >
-                Message
+                &gt; message
               </label>
               <textarea
                 id="contact-message"
                 name="message"
                 rows={5}
                 required
-                className={`${inputClass} resize-none`}
                 placeholder="Tell me about the role or project…"
+                className={`${fieldClass} resize-none`}
               />
             </div>
 
+            {/* ── Submit button ── */}
             <button
               id="contact-submit"
               type="submit"
               disabled={status === 'sending'}
-              className="hud-frame font-mono text-xs uppercase tracking-widest px-8 py-3.5 bg-signal text-ink hover:bg-signal/85 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="
+                w-full flex items-center justify-between
+                font-mono text-xs font-semibold uppercase tracking-[0.25em]
+                px-6 py-4
+                bg-signal text-ink
+                hover:bg-bone
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-colors duration-200
+              "
             >
-              {status === 'sending' ? 'Sending…' : 'Send message →'}
+              <span>{status === 'sending' ? 'Sending…' : 'Send message'}</span>
+              <span aria-hidden="true">↗</span>
             </button>
 
-            {/* Feedback messages */}
-            {status === 'success' && (
-              <p className="font-mono text-xs text-signal uppercase tracking-widest" role="status">
-                ✓ Message sent — I&apos;ll reply soon.
-              </p>
-            )}
-            {status === 'error' && (
-              <p className="font-mono text-xs text-bone/50 uppercase tracking-widest" role="alert">
-                Something went wrong — please email me directly.
+            {/* ── Status line (auto-clears after 4 s) ── */}
+            {(status === 'success' || status === 'error') && (
+              <p
+                role="status"
+                className={`font-mono text-xs ${
+                  status === 'success' ? 'text-emerald-400' : 'text-red-400'
+                }`}
+              >
+                {status === 'success'
+                  ? '✓ Message sent. Talk soon.'
+                  : '✕ Something went wrong. Please try again.'}
               </p>
             )}
           </form>
-
-          {/* ── Contact details ── */}
-          <div className="space-y-8 lg:pt-2">
-
-            <div>
-              <p className="font-mono text-xs uppercase tracking-widest text-signal mb-2">Email</p>
-              <a
-                href={`mailto:${personalInfo.email}`}
-                className="font-sans text-bone hover:text-signal transition-colors break-all"
-              >
-                {personalInfo.email}
-              </a>
-            </div>
-
-            {personalInfo.phone && (
-              <div>
-                <p className="font-mono text-xs uppercase tracking-widest text-signal mb-2">Phone</p>
-                <a
-                  href={`tel:${personalInfo.phone.replace(/\s/g, '')}`}
-                  className="font-sans text-bone hover:text-signal transition-colors"
-                >
-                  {personalInfo.phone}
-                </a>
-              </div>
-            )}
-
-            <div>
-              <p className="font-mono text-xs uppercase tracking-widest text-signal mb-2">Location</p>
-              <p className="font-sans text-bone">{personalInfo.city}</p>
-            </div>
-
-            <div>
-              <p className="font-mono text-xs uppercase tracking-widest text-signal mb-2">Status</p>
-              <p className="font-sans text-signal/90 text-sm">{personalInfo.availability}</p>
-            </div>
-
-            {/* Social links */}
-            <div className="flex gap-5 pt-4 border-t border-bone/10">
-              {socialLinks.github && (
-                <a
-                  href={socialLinks.github}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-xs uppercase tracking-widest text-dim hover:text-bone transition-colors"
-                >
-                  GitHub ↗
-                </a>
-              )}
-              {socialLinks.linkedin && (
-                <a
-                  href={socialLinks.linkedin}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-xs uppercase tracking-widest text-dim hover:text-bone transition-colors"
-                >
-                  LinkedIn ↗
-                </a>
-              )}
-            </div>
-          </div>
         </div>
+
       </div>
     </section>
   );

@@ -1,27 +1,48 @@
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import gsap from 'gsap';
-import { personalInfo, heroContent, socialLinks } from '../data/portfolioData';
+import { personalInfo, heroContent } from '../data/portfolioData';
+import ScrambleText from './ScrambleText';
+
+// Three.js scene loads in its own JS chunk — keeps the initial bundle light
+const HeroScene = lazy(() => import('./HeroScene'));
 
 /**
- * Hero — full-viewport landing section with an animated entrance.
- * Contains the name, role, intro sentence, two CTAs, and social links.
+ * Hero — full-viewport landing section.
+ *
+ * Left column : eyebrow · name (scramble decoded) · divider · role + intro · CTAs
+ * Right column : three.js HeroScene inside a .hud-frame box with corner labels
+ * Bottom strip : availability status + scroll indicator
  */
 export default function Hero() {
   const sectionRef = useRef(null);
+  const dividerRef = useRef(null);
+
+  // Split "Diya B Horapeti" → ["Diya", "B Horapeti"]
+  const nameParts = personalInfo.name.trim().split(/\s+/);
+  const nameFirst = nameParts[0];                       // solid bone
+  const nameRest  = nameParts.slice(1).join('\u00a0');  // outlined, non-breaking spaces
 
   useEffect(() => {
-    // Skip heavy motion if the user prefers reduced motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    // gsap.context scopes selectors to this section and auto-cleans up
     const ctx = gsap.context(() => {
-      gsap.from('[data-hero-item]', {
-        y: 48,
+      // Staggered fade-up for all data-hero="fade" elements
+      gsap.from('[data-hero="fade"]', {
         opacity: 0,
+        y: 30,
         duration: 1,
-        stagger: 0.13,
         ease: 'power3.out',
-        delay: 0.15,
+        stagger: 0.12,
+        delay: 0.3,
+      });
+
+      // Divider draws from the left
+      gsap.from(dividerRef.current, {
+        scaleX: 0,
+        transformOrigin: 'left center',
+        duration: 1.2,
+        ease: 'power3.inOut',
+        delay: 0.3,
       });
     }, sectionRef);
 
@@ -32,109 +53,129 @@ export default function Hero() {
     <section
       id="home"
       ref={sectionRef}
-      className="hud-grid relative min-h-screen flex items-center pt-14 overflow-hidden"
+      className="hud-grid relative min-h-screen flex flex-col overflow-hidden px-5 md:px-10 pt-24 pb-10"
     >
-      {/* ── Decorative vertical rule on the left ── */}
-      <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-signal/20 to-transparent hidden lg:block" />
+      {/* ── Two-column grid ─────────────────────────────────────────── */}
+      <div className="max-w-[1440px] mx-auto w-full grid lg:grid-cols-[1.1fr_0.9fr] items-center gap-10 flex-1">
 
-      <div className="mx-auto max-w-7xl px-6 py-28 w-full">
+        {/* ══ LEFT COLUMN ══════════════════════════════════════════════ */}
+        <div className="flex flex-col gap-6">
 
-        {/* Eyebrow */}
-        <p
-          data-hero-item
-          className="font-mono text-xs uppercase tracking-[0.25em] text-signal mb-8 flex items-center gap-3"
-        >
-          <span className="w-6 h-px bg-signal inline-block" />
-          {heroContent.eyebrow}
-        </p>
-
-        {/* Name — the biggest typographic element */}
-        <h1
-          data-hero-item
-          className="font-sans text-5xl sm:text-7xl lg:text-[clamp(4rem,9vw,7.5rem)] font-bold text-bone leading-[0.95] tracking-tight mb-5"
-        >
-          {personalInfo.name}
-        </h1>
-
-        {/* Role */}
-        <p
-          data-hero-item
-          className="font-mono text-base sm:text-lg uppercase tracking-[0.2em] text-signal mb-10"
-        >
-          {personalInfo.role}
-        </p>
-
-        {/* Intro sentence */}
-        <p
-          data-hero-item
-          className="font-sans text-lg sm:text-xl text-dim max-w-2xl mb-14 leading-relaxed"
-        >
-          {heroContent.intro}
-        </p>
-
-        {/* CTA buttons */}
-        <div data-hero-item className="flex flex-wrap gap-4 mb-16">
-          <a
-            href={heroContent.ctaPrimary.href}
-            id="hero-cta-primary"
-            className="hud-frame inline-flex items-center gap-2 bg-signal text-ink font-mono text-xs uppercase tracking-widest px-7 py-3.5 hover:bg-signal/85 active:scale-95 transition-all"
+          {/* Eyebrow */}
+          <p
+            data-hero="fade"
+            className="font-mono text-xs uppercase tracking-[0.3em] text-signal"
           >
-            {heroContent.ctaPrimary.label}
-            <span aria-hidden="true">→</span>
-          </a>
-          <a
-            href={heroContent.ctaSecondary.href}
-            id="hero-cta-secondary"
-            className="hud-frame inline-flex items-center gap-2 border border-bone/20 text-bone font-mono text-xs uppercase tracking-widest px-7 py-3.5 hover:border-signal hover:text-signal active:scale-95 transition-all"
+            {heroContent.eyebrow}
+          </p>
+
+          {/* Name — two-line, first solid, rest outlined */}
+          <h1
+            data-hero="fade"
+            className="text-[clamp(3.2rem,11vw,9.5rem)] font-bold uppercase leading-[0.88] tracking-[-0.04em]"
           >
-            {heroContent.ctaSecondary.label}
-          </a>
+            {/* First word: solid bone */}
+            <ScrambleText
+              as="span"
+              text={nameFirst}
+              trigger="mount"
+              delay={200}
+              className="block text-bone"
+            />
+
+            {/* Rest: outlined with webkit-text-stroke */}
+            <ScrambleText
+              as="span"
+              text={nameRest}
+              trigger="mount"
+              delay={500}
+              className="block text-transparent"
+              style={{ WebkitTextStroke: '1.5px #e8e6df' }}
+            />
+          </h1>
+
+          {/* Divider — animates scaleX 0→1 from the left */}
+          <div
+            ref={dividerRef}
+            className="h-px max-w-xl bg-bone/25"
+          />
+
+          {/* Role + intro */}
+          <div data-hero="fade" className="flex flex-col gap-3">
+            <p className="font-mono text-xs uppercase tracking-[0.25em] text-dim">
+              {personalInfo.role}
+            </p>
+            <p className="text-lg md:text-xl text-bone/85 leading-relaxed max-w-lg">
+              {heroContent.intro}
+            </p>
+          </div>
+
+          {/* CTA buttons */}
+          <div data-hero="fade" className="flex flex-wrap gap-3 mt-2">
+            {/* Primary — signal fill, hover to bone */}
+            <a
+              href={heroContent.ctaPrimary.href}
+              className="group inline-flex items-center gap-2 bg-signal text-ink hover:bg-bone font-mono text-xs font-semibold uppercase tracking-[0.2em] px-6 py-3.5 transition-colors duration-200"
+            >
+              {heroContent.ctaPrimary.label}
+              <span
+                aria-hidden="true"
+                className="transition-transform duration-200 group-hover:translate-x-1"
+              >
+                →
+              </span>
+            </a>
+
+            {/* Secondary — ghost border, hover to signal */}
+            <a
+              href={heroContent.ctaSecondary.href}
+              className="inline-flex items-center gap-2 border border-bone/30 text-bone hover:border-signal hover:text-signal font-mono text-xs font-semibold uppercase tracking-[0.2em] px-6 py-3.5 transition-colors duration-200"
+            >
+              {heroContent.ctaSecondary.label}
+            </a>
+          </div>
         </div>
 
-        {/* Social links */}
-        <div data-hero-item className="flex gap-6 items-center">
-          {socialLinks.github && (
-            <a
-              href={socialLinks.github}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-xs uppercase tracking-widest text-dim hover:text-bone transition-colors"
-            >
-              GitHub ↗
-            </a>
-          )}
-          {socialLinks.linkedin && (
-            <a
-              href={socialLinks.linkedin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-xs uppercase tracking-widest text-dim hover:text-bone transition-colors"
-            >
-              LinkedIn ↗
-            </a>
-          )}
-          {socialLinks.instagram && (
-            <a
-              href={socialLinks.instagram}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-xs uppercase tracking-widest text-dim hover:text-bone transition-colors"
-            >
-              Instagram ↗
-            </a>
-          )}
+        {/* ══ RIGHT COLUMN ═════════════════════════════════════════════ */}
+        <div
+          data-hero="fade"
+          className="hud-frame relative border border-bone/10 bg-panel/40 h-[48vh] min-h-[320px] lg:h-[70vh]"
+        >
+          {/* Top-left corner label */}
+          <span
+            className="absolute top-3 left-3 z-10 font-mono text-[10px] uppercase tracking-[0.25em] text-dim pointer-events-none select-none"
+          >
+            core.view — drag to rotate
+          </span>
+
+          {/* The 3D scene — fills the box, Three.js loads in a separate chunk */}
+          <Suspense fallback={null}>
+            <HeroScene />
+          </Suspense>
+
+          {/* Bottom-right corner label */}
+          <span
+            className="absolute bottom-3 right-3 z-10 font-mono text-[10px] uppercase tracking-[0.25em] text-dim pointer-events-none select-none"
+          >
+            {personalInfo.city}
+          </span>
         </div>
       </div>
 
-      {/* ── Scroll indicator ── */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-dim/50">Scroll</span>
-        <div className="w-px h-10 bg-gradient-to-b from-dim/40 to-transparent" />
-      </div>
+      {/* ── Bottom strip ────────────────────────────────────────────── */}
+      <div className="max-w-[1440px] mx-auto w-full mt-10 border-t border-bone/10 pt-5 flex items-center justify-between font-mono text-[11px] uppercase tracking-[0.2em] text-dim">
+        {/* Availability */}
+        <div className="flex items-center gap-2.5">
+          {/* Pulsing signal dot */}
+          <span className="relative flex h-1.5 w-1.5 shrink-0">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-signal" />
+          </span>
+          {personalInfo.availability}
+        </div>
 
-      {/* ── Decorative city/timezone label ── */}
-      <div className="absolute bottom-8 right-6 font-mono text-[10px] text-dim/30 tracking-widest hidden lg:block">
-        {personalInfo.city} &nbsp;/&nbsp; {personalInfo.timezone}
+        {/* Scroll indicator — visible from sm */}
+        <span className="hidden sm:block">Scroll ↓</span>
       </div>
     </section>
   );

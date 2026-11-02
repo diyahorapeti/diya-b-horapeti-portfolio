@@ -1,78 +1,109 @@
 import { useEffect, useRef } from 'react';
+import gsap from 'gsap';
 
 /**
- * Cursor — renders a small dot (snaps instantly) and a larger ring
- * (lags behind for a fluid feel). Only activates on fine-pointer
- * devices (desktop mouse). Respects prefers-reduced-motion.
+ * Cursor — crosshair-style custom cursor with:
+ *   • a 6px signal-orange dot that snaps instantly to the pointer
+ *   • a 36px ring (bone/60 border) that follows with a spring delay
+ *
+ * Only activates on fine-pointer (desktop mouse) devices without
+ * prefers-reduced-motion. Adds `.has-cursor` to <body> so index.css
+ * hides the native OS cursor.
+ *
+ * Hover effect: ring scales up and turns signal-orange over interactive
+ * elements (a, button, input, textarea, [data-cursor="hot"]).
  */
 export default function Cursor() {
   const dotRef = useRef(null);
   const ringRef = useRef(null);
 
   useEffect(() => {
-    // Skip on touch-only devices
+    // Only run on real-mouse devices without reduced-motion preference
     if (!window.matchMedia('(pointer: fine)').matches) return;
-    // Skip if user prefers reduced motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    // Tell CSS to hide the default OS cursor
-    document.body.classList.add('has-cursor');
 
     const dot = dotRef.current;
     const ring = ringRef.current;
 
-    let mouseX = 0;
-    let mouseY = 0;
-    let ringX = 0;
-    let ringY = 0;
-    let rafId;
+    // Reveal both elements and centre them on their own origin
+    gsap.set([dot, ring], { opacity: 1, xPercent: -50, yPercent: -50 });
 
-    // Dot follows the pointer instantly
+    // Hide the OS cursor
+    document.body.classList.add('has-cursor');
+
+    // ── Dot: snap exactly to pointer ─────────────────────────────
     const onMove = (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-      dot.style.transform = `translate(${mouseX}px, ${mouseY}px) translate(-50%, -50%)`;
+      gsap.set(dot, { x: e.clientX, y: e.clientY });
     };
 
-    // Ring lerps toward the pointer for a trailing-lag effect
-    const animate = () => {
-      ringX += (mouseX - ringX) * 0.12;
-      ringY += (mouseY - ringY) * 0.12;
-      ring.style.transform = `translate(${ringX}px, ${ringY}px) translate(-50%, -50%)`;
-      rafId = requestAnimationFrame(animate);
-    };
-    animate();
+    // ── Ring: spring-follow with quickTo ─────────────────────────
+    const setRingX = gsap.quickTo(ring, 'x', { duration: 0.35, ease: 'power3.out' });
+    const setRingY = gsap.quickTo(ring, 'y', { duration: 0.35, ease: 'power3.out' });
 
-    window.addEventListener('mousemove', onMove);
+    const onMoveRing = (e) => {
+      setRingX(e.clientX);
+      setRingY(e.clientY);
+    };
+
+    // ── Hover effect: scale + colour change ──────────────────────
+    const HOT_SELECTORS = 'a, button, input, textarea, [data-cursor="hot"]';
+
+    const onPointerOver = (e) => {
+      const isHot = e.target.closest(HOT_SELECTORS);
+      if (isHot) {
+        // Scale up and switch to signal orange
+        gsap.to(ring, {
+          scale: 1.8,
+          borderColor: '#ff5b1f',
+          duration: 0.2,
+          ease: 'power2.out',
+        });
+      } else {
+        // Reset to default size and bone/60 colour
+        gsap.to(ring, {
+          scale: 1,
+          borderColor: 'rgba(232,230,223,0.6)',
+          duration: 0.2,
+          ease: 'power2.out',
+        });
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointermove', onMoveRing);
+    window.addEventListener('pointerover', onPointerOver);
 
     return () => {
-      window.removeEventListener('mousemove', onMove);
-      cancelAnimationFrame(rafId);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointermove', onMoveRing);
+      window.removeEventListener('pointerover', onPointerOver);
       document.body.classList.remove('has-cursor');
     };
   }, []);
 
   return (
     <>
-      {/* Solid dot — instant */}
+      {/* 6px signal-orange dot — instant */}
       <div
         ref={dotRef}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[9999]"
-        style={{ willChange: 'transform' }}
+        className="pointer-events-none fixed top-0 left-0 z-[999]"
+        style={{ opacity: 0, willChange: 'transform' }}
       >
-        <div className="w-2 h-2 rounded-full bg-signal" />
+        <div className="w-1.5 h-1.5 rounded-full bg-signal" />
       </div>
 
-      {/* Hollow ring — lags slightly */}
+      {/* 36px ring — spring-lagged */}
       <div
         ref={ringRef}
         aria-hidden="true"
-        className="pointer-events-none fixed top-0 left-0 z-[9998]"
-        style={{ willChange: 'transform' }}
-      >
-        <div className="w-9 h-9 rounded-full border border-signal/40" />
-      </div>
+        className="pointer-events-none fixed top-0 left-0 z-[999] w-9 h-9 rounded-full"
+        style={{
+          opacity: 0,
+          border: '1px solid rgba(232,230,223,0.6)',
+          willChange: 'transform',
+        }}
+      />
     </>
   );
 }
